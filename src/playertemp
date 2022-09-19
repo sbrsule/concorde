@@ -1,0 +1,54 @@
+fn collision_check(
+    mut player_query: Query<(&Transform, &mut Direction), With<Player>>,
+    wall_query: Query<&Transform, (With<Wall>, Without<Player>)>
+) {
+    let (transform, mut direction) = player_query.single_mut();
+        
+    for wall in wall_query.iter() {
+        let new_translation = match direction {
+            Direction::Left => Vec3::new(transform.translation.x - PLAYER_SPEED, player_transform.translation.y, player_transform.translation.z),
+            Direction::Right => Vec3::new(player_transform.translation.x + PLAYER_SPEED, player_transform.translation.y, player_transform.translation.z),
+            Direction::Up => Vec3::new(player_transform.translation.x, player_transform.translation.y + PLAYER_SPEED, player_transform.translation.z),
+            Direction::Down => Vec3::new(player_transform.translation.x, player_transform.translation.y - PLAYER_SPEED, player_transform.translation.z),
+            Direction::None => player_transform.translation,
+        };
+        
+            let collision = collide(
+                new_translation,
+                Vec2::splat(TILE_OFFSET),
+                wall.translation,
+                Vec2::splat(TILE_OFFSET)
+            );
+        
+            match collision {
+                Some(collision) => {
+                    match collision {
+                    Collision::Left => {
+                        if player.direction == Direction::Right {
+                            player.direction = Direction::None;
+                        }
+                    },
+                    Collision::Right => {
+                        if player.direction == Direction::Left {
+                            player.direction = Direction::None;
+                        }
+                    },
+                    Collision::Top => {
+                        if player.direction == Direction::Down {
+                            player.direction = Direction::None;
+                        }
+                    },
+                    Collision::Bottom => {
+                        if player.direction == Direction::Up {
+                            player.direction = Direction::None;
+                        }
+                    },
+                    Collision::Inside => (),
+                }
+            },
+            None => (),
+        }
+    }
+}
+
+
