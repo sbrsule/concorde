@@ -5,5 +5,4 @@ pub enum GameState {
     InGame,
     LoadGame,
     Paused,
-    Combat,
 }

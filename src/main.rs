@@ -1,5 +1,5 @@
 use bevy_ecs_ldtk::{LdtkPlugin, LevelSelection, prelude::RegisterLdtkObjects};
-use enemy::knight::KnightBundle;
+use enemy::{knight::KnightBundle, EnemyPlugin};
 use iyes_loopless::{prelude::AppLooplessStateExt, state::NextState};
 use level::{LevelPlugin, PlayerBundle, WallBundle};
 use bevy::{prelude::*, render::texture::ImageSettings, time::FixedTimestep, sprite::collide_aabb::{collide, Collision}};
@@ -29,6 +29,7 @@ fn main() {
         .add_plugin(LevelPlugin)
         .add_plugin(PlayerPlugin)
         .add_plugin(MainMenuPlugin)
+        .add_plugin(EnemyPlugin)
         .insert_resource(LevelSelection::Index(0))
         .register_ldtk_entity::<PlayerBundle>("Player")
         .register_ldtk_entity::<KnightBundle>("Knight")
