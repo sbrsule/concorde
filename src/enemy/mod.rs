@@ -1,13 +1,13 @@
 use std::time::Duration;
 
-use bevy::{prelude::{Component, Vec2, Handle, Image, AssetServer, Assets, IVec2, Transform, Query, EventWriter, Plugin, App, CoreStage, SystemStage}, sprite::TextureAtlas};
+use bevy::{prelude::{Component, Vec2, Handle, Image, AssetServer, Assets, IVec2, Transform, Query, EventWriter, Plugin, App, CoreStage, SystemStage, Res}, sprite::TextureAtlas, time::Time};
 use bevy_ecs_ldtk::{prelude::{LdtkEntity, LayerInstance, TilesetDefinition, FieldValue}, EntityInstance, utils::ldtk_pixel_coords_to_translation_pivoted};
-use iyes_loopless::{prelude::FixedTimestepStage, condition::ConditionSet};
+use iyes_loopless::{prelude::FixedTimestepStage, condition::{ConditionSet, IntoConditionalSystem}};
 use crate::{player::{Direction, FrameTimer}, misc::state::GameState};
 
 pub mod knight;
 
-const ENEMY_SPEED: f32 = 0.1;
+const ENEMY_SPEED: f32 = 1.0/3.0;
 
 pub struct PatrolPointReached(Patrol);
 
@@ -16,12 +16,15 @@ pub struct EnemyPlugin;
 impl Plugin for EnemyPlugin {
     fn build(&self, app: &mut App) {
         app
-            .add_system_set(
-                ConditionSet::new()
+            .add_system(
+                next_patrol
                     .run_in_state(GameState::InGame)
-                    .with_system(next_patrol)
-                    .with_system(enemy_movement)
-                    .into()
+                    .label("patrol")
+            )
+            .add_system(
+                enemy_movement
+                    .run_in_state(GameState::InGame)
+                    .after("patrol")
             );
     }
 
@@ -33,6 +36,7 @@ impl Plugin for EnemyPlugin {
 pub struct Patrol {
     pub points: Vec<Vec2>,
     pub index: usize,
+    pub forward: bool,
 }
 
 impl LdtkEntity for Patrol {
@@ -65,7 +69,7 @@ impl LdtkEntity for Patrol {
                     // The patrols set up in the file look flat and grounded,
                     // but technically they're not if you consider the pivot,
                     // which is at the bottom-center for the skulls.
-                    let pixel_coords = (ldtk_point.as_vec2() + Vec2::new(0.5, 1.))
+                    let pixel_coords = (ldtk_point.as_vec2() + Vec2::new(0.5, 0.5))
                         * Vec2::splat(layer_instance.grid_size as f32);
 
                     points.push(ldtk_pixel_coords_to_translation_pivoted(
@@ -81,6 +85,7 @@ impl LdtkEntity for Patrol {
         Patrol {
             points,
             index: 1,
+            forward: true,
         }
     }
 }
@@ -90,21 +95,39 @@ fn next_patrol(
 ) {
     for (mut patrol, mut direction, transform) in query.iter_mut() {
         if patrol.points.len() > 1 {
+            // try to do something similar to future collisions, but check patrol within margin of error
+            let mut new_vec: Vec2;
+            match *direction {
+                Direction::Right => new_vec = transform.translation.truncate() + Vec2::new(ENEMY_SPEED, 0.0),
+                Direction::Left => new_vec = transform.translation.truncate() + Vec2::new(-ENEMY_SPEED, 0.0),
+                Direction::Up => new_vec = transform.translation.truncate() + Vec2::new(0.0, ENEMY_SPEED),
+                Direction::Right => new_vec = transform.translation.truncate() + Vec2::new(0.0, -ENEMY_SPEED),
+                _ => ()
+            }
             if patrol.points[patrol.index] == transform.translation.truncate() {
+                println!("reset patrol");
                 if patrol.index == patrol.points.len() - 1 {
-                    patrol.index = 0;
-                } else {
+                    patrol.index -= 1;
+                    patrol.forward = false;
+                } else if patrol.index == 0 {
                     patrol.index += 1;
+                    patrol.forward = true;
+                } else if patrol.forward {
+                    patrol.index += 1;
+                } else {
+                    patrol.index -= 1;
                 }
+            } else {
+                println!("patrol point: {:?}, sprite point: {:?}", patrol.points[patrol.index], transform.translation.truncate())
             }
 
-            if patrol.points[patrol.index][0] > transform.translation.x + 1.0 {
+            if patrol.points[patrol.index][0] > transform.translation.x {
                 *direction = Direction::Right;
-            } else if patrol.points[patrol.index][0] < transform.translation.x - 1.0 {
+            } else if patrol.points[patrol.index][0] < transform.translation.x {
                 *direction = Direction::Left;
-            } else if patrol.points[patrol.index][1] > transform.translation.y  + 1.0 {
+            } else if patrol.points[patrol.index][1] > transform.translation.y {
                 *direction = Direction::Up;
-            } else if patrol.points[patrol.index][1] < transform.translation.y - 1.0 {
+            } else if patrol.points[patrol.index][1] < transform.translation.y {
                 *direction = Direction::Down;
             }
         }
@@ -112,15 +135,42 @@ fn next_patrol(
 }
 
 fn enemy_movement(
-    mut enemy: Query<(&Direction, &mut Transform)>
+    mut enemy: Query<(&Direction, &mut Transform, &mut FrameTimer, &Patrol)>,
+    time: Res<Time>,
 ) {
-    for (direction, mut transform) in enemy.iter_mut() {
-        match direction {
-            Direction::Right => transform.translation.x += ENEMY_SPEED,
-            Direction::Left => transform.translation.x -= ENEMY_SPEED,
-            Direction::Up => transform.translation.y += ENEMY_SPEED,
-            Direction::Down => transform.translation.y -= ENEMY_SPEED,
-            _ => (),
+    for (direction, mut transform, mut frame_timer, patrol) in enemy.iter_mut() {
+        if frame_timer.tick(time.delta()).just_finished() {
+            match direction {
+                Direction::Right => {
+                    if patrol.points[patrol.index][0] < transform.translation.x + ENEMY_SPEED {
+                        transform.translation.x = patrol.points[patrol.index][0];
+                    } else {
+                        transform.translation.x += ENEMY_SPEED
+                    }
+                },
+                Direction::Left => {
+                    if patrol.points[patrol.index][0] > transform.translation.x - ENEMY_SPEED {
+                        transform.translation.x = patrol.points[patrol.index][0];
+                    } else {
+                        transform.translation.x -= ENEMY_SPEED
+                    }
+                },
+                Direction::Up => {
+                    if patrol.points[patrol.index][1] < transform.translation.y + ENEMY_SPEED {
+                        transform.translation.y = patrol.points[patrol.index][1];
+                    } else {
+                        transform.translation.y += ENEMY_SPEED
+                    }
+                },
+                Direction::Down => {
+                    if patrol.points[patrol.index][1] > transform.translation.y - ENEMY_SPEED {
+                        transform.translation.y = patrol.points[patrol.index][1];
+                    } else {
+                        transform.translation.y -= ENEMY_SPEED
+                    }
+                },
+                _ => (),
+            }
         }
     }
 }
