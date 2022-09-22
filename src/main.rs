@@ -22,6 +22,12 @@ fn main() {
     App::new()
         .insert_resource(ImageSettings::default_nearest())
         .insert_resource(Msaa { samples: 1 })
+        .insert_resource(WindowDescriptor {
+            title: "Concord".to_string(),
+            width: 1024.0,
+            height: 768.0,
+            ..Default::default()
+        })
         .add_plugins(DefaultPlugins)
         .add_loopless_state(GameState::LoadMenu)
         .add_plugin(LdtkPlugin)
