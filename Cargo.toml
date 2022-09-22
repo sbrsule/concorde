@@ -13,3 +13,5 @@ tiled = "0.10.2"
 iyes_loopless = "0.7.1"
 bevy_ecs_ldtk = { version = "0.4.0", features = ["atlas"] }
 bevy_asset_loader = { version = "0.12.1", features = ["stageless"] }
+image = "0.24.3"
+winit = "0.26.1"

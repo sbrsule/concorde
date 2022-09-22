@@ -96,16 +96,7 @@ fn next_patrol(
     for (mut patrol, mut direction, transform) in query.iter_mut() {
         if patrol.points.len() > 1 {
             // try to do something similar to future collisions, but check patrol within margin of error
-            let mut new_vec: Vec2;
-            match *direction {
-                Direction::Right => new_vec = transform.translation.truncate() + Vec2::new(ENEMY_SPEED, 0.0),
-                Direction::Left => new_vec = transform.translation.truncate() + Vec2::new(-ENEMY_SPEED, 0.0),
-                Direction::Up => new_vec = transform.translation.truncate() + Vec2::new(0.0, ENEMY_SPEED),
-                Direction::Right => new_vec = transform.translation.truncate() + Vec2::new(0.0, -ENEMY_SPEED),
-                _ => ()
-            }
             if patrol.points[patrol.index] == transform.translation.truncate() {
-                println!("reset patrol");
                 if patrol.index == patrol.points.len() - 1 {
                     patrol.index -= 1;
                     patrol.forward = false;
@@ -117,10 +108,7 @@ fn next_patrol(
                 } else {
                     patrol.index -= 1;
                 }
-            } else {
-                println!("patrol point: {:?}, sprite point: {:?}", patrol.points[patrol.index], transform.translation.truncate())
-            }
-
+            } 
             if patrol.points[patrol.index][0] > transform.translation.x {
                 *direction = Direction::Right;
             } else if patrol.points[patrol.index][0] < transform.translation.x {

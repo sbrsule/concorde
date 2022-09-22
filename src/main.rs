@@ -2,10 +2,11 @@ use bevy_ecs_ldtk::{LdtkPlugin, LevelSelection, prelude::RegisterLdtkObjects};
 use enemy::{knight::KnightBundle, EnemyPlugin};
 use iyes_loopless::{prelude::AppLooplessStateExt, state::NextState};
 use level::{LevelPlugin, PlayerBundle, WallBundle};
-use bevy::{prelude::*, render::texture::ImageSettings, time::FixedTimestep, sprite::collide_aabb::{collide, Collision}};
+use bevy::{prelude::*, render::texture::ImageSettings, time::FixedTimestep, sprite::collide_aabb::{collide, Collision}, window::WindowId, winit::WinitWindows};
 use misc::state::GameState;
 use player::{AnimationTimer, Player, Direction, PlayerPlugin};
 use ui::main_menu::MainMenuPlugin;
+use winit::window::Icon;
 
 mod level;
 mod player;
@@ -31,6 +32,7 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_loopless_state(GameState::LoadMenu)
         .add_plugin(LdtkPlugin)
+        .add_startup_system(set_window_icon)
         .add_enter_system(GameState::LoadGame, setup_camera)
         .add_plugin(LevelPlugin)
         .add_plugin(PlayerPlugin)
@@ -61,4 +63,21 @@ fn setup_camera(
         .insert(PlayerCamera);
 
     commands.insert_resource(NextState(GameState::InGame));
+}
+
+fn set_window_icon(
+    windows: NonSend<WinitWindows>,
+) {
+    let primary = windows.get_window(WindowId::primary()).unwrap();
+    let (icon_rgba, icon_width, icon_height) = {
+        let image = image::open("assets/sprites/icon.png")
+            .expect("Failed to open icon")
+            .into_rgba8();
+        let (width, height) = image.dimensions();
+        let rgba = image.into_raw();
+        (rgba, width, height)
+    };
+
+    let icon = Icon::from_rgba(icon_rgba, icon_width, icon_height).unwrap();
+    primary.set_window_icon(Some(icon));
 }
